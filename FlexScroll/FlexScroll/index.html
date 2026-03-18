@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FlexScroll">
+<title>FlexScroll</title>
+<link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js"></script>
+<style>
+:root {
+  --bg:#0a0a08;--card:#111110;--border:#1e1e1b;
+  --amber:#F5A623;--amber-dim:rgba(245,166,35,0.10);
+  --text:#c8c4b8;--muted:#3a3835;--red:#E8472A;--green:#4CAF50;
+  --safe:env(safe-area-inset-bottom,0px);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-family:'Courier Prime',monospace;overflow:hidden;}
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:opacity .35s;overflow:hidden;}
+.screen.on{opacity:1;pointer-events:all;}
+
+/* LOADING */
+#s-loading{align-items:center;justify-content:center;gap:32px;background:var(--bg);}
+.load-logo{font-family:'Russo One',sans-serif;font-size:48px;letter-spacing:4px;color:var(--amber);}
+.load-logo span{color:#252523;}
+.load-track{width:200px;height:3px;background:#1a1a18;border-radius:2px;overflow:hidden;}
+.load-fill{height:100%;background:var(--amber);width:0;transition:width .3s;}
+.load-txt{font-size:10px;letter-spacing:.2em;color:var(--muted);text-transform:uppercase;}
+
+/* SETUP */
+#s-setup{align-items:center;justify-content:center;padding:32px;gap:22px;text-align:center;}
+.setup-logo{font-family:'Russo One',sans-serif;font-size:52px;letter-spacing:3px;color:var(--amber);}
+.setup-logo span{color:#252523;}
+.setup-sub{font-size:11px;letter-spacing:.18em;color:var(--muted);text-transform:uppercase;line-height:2;}
+.setup-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:22px;width:100%;max-width:340px;display:flex;flex-direction:column;gap:18px;}
+.setup-step{display:flex;align-items:flex-start;gap:14px;text-align:left;}
+.sn{font-family:'Russo One',sans-serif;font-size:26px;color:var(--amber);min-width:28px;line-height:1.1;}
+.st{font-size:12px;line-height:1.7;color:var(--text);}
+.input-group{display:flex;flex-direction:column;gap:8px;}
+.input-label{font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);}
+.pin-input{background:#0d0d0c;border:1.5px solid var(--border);border-radius:10px;padding:14px 16px;font-family:'Russo One',sans-serif;font-size:28px;letter-spacing:8px;color:var(--amber);text-align:center;width:100%;outline:none;transition:border-color .2s;-webkit-appearance:none;}
+.pin-input:focus{border-color:var(--amber);}
+.pin-hint{font-size:10px;color:var(--muted);text-align:center;}
+
+/* BUTTONS */
+.btn-primary{background:var(--amber);color:#000;border:none;padding:16px;font-family:'Russo One',sans-serif;font-size:22px;letter-spacing:3px;border-radius:12px;cursor:pointer;width:100%;transition:transform .1s,filter .1s;}
+.btn-primary:active{transform:scale(.97);filter:brightness(.88);}
+.btn-outline{background:transparent;color:var(--amber);border:1.5px solid var(--amber);padding:14px;font-family:'Russo One',sans-serif;font-size:18px;letter-spacing:2px;border-radius:12px;cursor:pointer;width:100%;transition:transform .1s,background .15s;}
+.btn-outline:active{transform:scale(.97);background:var(--amber-dim);}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border);padding:12px;font-size:11px;border-radius:10px;cursor:pointer;width:100%;transition:color .2s;}
+.btn-ghost:active{color:var(--text);}
+.btn-disabled{opacity:.3;pointer-events:none;}
+.back-btn{background:transparent;border:1px solid var(--border);color:var(--muted);width:40px;height:40px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.back-btn:active{background:var(--border);}
+
+/* HOME */
+#s-home{padding:0;}
+.home-header{padding:56px 28px 0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.home-logo{font-family:'Russo One',sans-serif;font-size:24px;letter-spacing:2px;color:var(--amber);}
+.partner-btn{background:transparent;border:1px solid var(--border);color:var(--muted);padding:7px 14px;border-radius:20px;font-size:10px;letter-spacing:.08em;cursor:pointer;transition:color .2s,border-color .2s;}
+.partner-btn:active{color:var(--text);border-color:#333;}
+.balance-section{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 28px;}
+.bal-label{font-size:9px;letter-spacing:.25em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+.bal-num{font-family:'Russo One',sans-serif;font-size:110px;line-height:.9;color:var(--amber);letter-spacing:-2px;transition:color .3s;}
+.bal-num.zero{color:#1e1e1c;}
+.bal-unit{font-size:12px;letter-spacing:.15em;color:var(--muted);margin-top:8px;text-transform:uppercase;}
+.bal-reps{font-size:10px;color:#222;margin-top:4px;}
+.home-history{width:100%;padding:0 28px;max-height:108px;overflow:hidden;flex-shrink:0;}
+.hist-item{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:10px;}
+.hist-item:last-child{border-bottom:none;}
+.hist-action{color:var(--muted);}
+.hist-val{font-family:'Russo One',sans-serif;font-size:13px;}
+.hist-val.earn{color:var(--green);}
+.hist-val.spend{color:var(--red);}
+.home-actions{padding:16px 28px calc(28px + var(--safe));display:flex;flex-direction:column;gap:10px;width:100%;flex-shrink:0;}
+
+/* EARN */
+#s-earn{background:var(--bg);}
+.earn-header{padding:56px 24px 0;display:flex;align-items:center;gap:16px;flex-shrink:0;}
+.earn-title{font-family:'Russo One',sans-serif;font-size:26px;color:var(--amber);letter-spacing:2px;}
+.cam-wrap{position:relative;width:100%;flex-shrink:0;}
+#vid{width:100%;max-height:50vh;object-fit:cover;display:block;transform:scaleX(-1);}
+#cvs{position:absolute;inset:0;width:100%;height:100%;transform:scaleX(-1);}
+.cam-pill{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.75);backdrop-filter:blur(10px);border:1px solid #222;border-radius:20px;padding:6px 14px;display:flex;align-items:center;gap:8px;font-size:10px;color:#777;white-space:nowrap;}
+.cdot{width:7px;height:7px;border-radius:50%;background:#333;flex-shrink:0;}
+.cdot.live{background:var(--amber);animation:pulse 1.2s infinite;}
+.cdot.low{background:var(--red);}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.earn-hud{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:space-evenly;padding:12px 24px 24px;}
+.earn-counters{display:flex;align-items:flex-end;gap:24px;}
+.ec-block{text-align:center;}
+.ec-lbl{font-size:8px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-bottom:2px;}
+.ec-val{font-family:'Russo One',sans-serif;line-height:1;}
+.ec-val.big{font-size:88px;color:var(--amber);}
+.ec-val.med{font-size:38px;color:#444;}
+.ec-div{width:1px;height:56px;background:var(--border);margin-bottom:4px;}
+.pbar-wrap{width:100%;max-width:300px;height:3px;background:#111;border-radius:3px;overflow:hidden;}
+.pbar{height:100%;background:var(--amber);width:50%;transition:width .08s;}
+#flash{position:fixed;inset:0;background:rgba(245,166,35,.1);opacity:0;pointer-events:none;z-index:99;transition:opacity .05s;}
+#flash.show{opacity:1;}
+
+/* SPEND */
+#s-spend{align-items:center;justify-content:center;padding:32px;gap:22px;text-align:center;}
+.spend-row{width:100%;max-width:340px;display:flex;align-items:center;gap:16px;}
+.spend-title{font-family:'Russo One',sans-serif;font-size:28px;color:var(--amber);letter-spacing:2px;}
+.bal-badge{margin-left:auto;background:var(--amber-dim);border:1px solid rgba(245,166,35,.2);border-radius:20px;padding:5px 12px;font-size:10px;color:var(--amber);}
+.slider-block{width:100%;max-width:340px;display:flex;flex-direction:column;gap:16px;}
+.slider-display{font-family:'Russo One',sans-serif;font-size:80px;color:var(--amber);line-height:1;}
+.slider-sub{font-size:11px;color:var(--muted);letter-spacing:.1em;}
+.range-input{width:100%;-webkit-appearance:none;height:4px;background:var(--border);border-radius:4px;outline:none;}
+.range-input::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;background:var(--amber);cursor:pointer;box-shadow:0 0 0 4px var(--amber-dim);}
+.range-marks{display:flex;justify-content:space-between;font-size:9px;color:var(--muted);}
+
+/* CODE */
+#s-code{align-items:center;justify-content:center;padding:32px;gap:18px;text-align:center;}
+.code-intro{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;line-height:2;}
+.code-box{background:var(--card);border:2px solid var(--amber);border-radius:16px;padding:26px 32px;display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;max-width:320px;position:relative;overflow:hidden;}
+.code-box::before{content:'';position:absolute;inset:0;background:var(--amber-dim);}
+.code-lbl{font-size:9px;letter-spacing:.25em;text-transform:uppercase;color:var(--amber);opacity:.6;position:relative;}
+.code-chars{font-family:'Russo One',sans-serif;font-size:54px;letter-spacing:10px;color:var(--amber);position:relative;}
+.code-mins{font-size:12px;color:var(--text);position:relative;}
+.code-expiry{font-size:10px;color:var(--muted);position:relative;}
+.code-expiry span{color:var(--amber);}
+.code-steps{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;max-width:320px;width:100%;display:flex;flex-direction:column;gap:8px;text-align:left;}
+.cstep{display:flex;gap:10px;font-size:11px;line-height:1.6;color:var(--muted);}
+.csn{color:var(--amber);font-family:'Russo One',sans-serif;font-size:14px;min-width:14px;}
+
+/* PARTNER */
+#s-partner{align-items:center;justify-content:center;padding:32px;gap:18px;text-align:center;}
+.p-logo{font-family:'Russo One',sans-serif;font-size:34px;letter-spacing:3px;color:var(--amber);}
+.p-sub{font-size:10px;letter-spacing:.18em;color:var(--muted);text-transform:uppercase;}
+.p-form{width:100%;max-width:320px;display:flex;flex-direction:column;gap:14px;}
+.code-input{background:#0d0d0c;border:1.5px solid var(--border);border-radius:10px;padding:14px 16px;font-family:'Russo One',sans-serif;font-size:32px;letter-spacing:8px;color:var(--amber);text-align:center;width:100%;outline:none;text-transform:uppercase;transition:border-color .2s;-webkit-appearance:none;}
+.code-input:focus{border-color:var(--amber);}
+.verdict{border-radius:14px;padding:22px;width:100%;max-width:320px;display:flex;flex-direction:column;align-items:center;gap:8px;animation:fadeUp .3s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.verdict.ok{background:rgba(76,175,80,.08);border:1.5px solid var(--green);}
+.verdict.fail{background:rgba(232,71,42,.08);border:1.5px solid var(--red);}
+.v-icon{font-size:38px;}
+.v-title{font-family:'Russo One',sans-serif;font-size:24px;letter-spacing:2px;}
+.verdict.ok .v-title{color:var(--green);}
+.verdict.fail .v-title{color:var(--red);}
+.v-mins{font-family:'Russo One',sans-serif;font-size:48px;color:var(--green);line-height:1;}
+.v-msg{font-size:12px;line-height:1.7;color:var(--muted);}
+
+/* ERROR */
+#s-error{align-items:center;justify-content:center;gap:20px;text-align:center;padding:32px;}
+.err-icon{font-size:52px;}
+.err-title{font-family:'Russo One',sans-serif;font-size:36px;color:var(--red);letter-spacing:2px;}
+.err-msg{font-size:12px;color:var(--muted);line-height:1.8;max-width:300px;}
+</style>
+</head>
+<body>
+
+<div id="flash"></div>
+
+<!-- LOADING -->
+<div class="screen on" id="s-loading">
+  <div class="load-logo">FLEX<span>SCROLL</span></div>
+  <div class="load-track"><div class="load-fill" id="lbar"></div></div>
+  <div class="load-txt" id="ltxt">A iniciar...</div>
+</div>
+
+<!-- SETUP (first run) -->
+<div class="screen" id="s-setup">
+  <div class="setup-logo">FLEX<span>SCROLL</span></div>
+  <div class="setup-sub">Configura uma vez.<br>Depois é só suar.</div>
+  <div class="setup-card">
+    <div class="setup-step">
+      <div class="sn">1</div>
+      <div class="st">Define um <strong>PIN secreto</strong> com a tua parceira. Só ela o sabe — sem PIN, não há validação.</div>
+    </div>
+    <div class="setup-step">
+      <div class="sn">2</div>
+      <div class="st">Fazes flexões, acumulas minutos. Quando queres scroll, geras um código. Ela valida e desbloqueia o Screen Time.</div>
+    </div>
+    <div class="input-group">
+      <div class="input-label">PIN da parceira (4+ dígitos)</div>
+      <input class="pin-input" id="setup-pin" type="number" inputmode="numeric" placeholder="••••">
+      <div class="pin-hint">Ela vai usar este PIN para validar os teus pedidos</div>
+    </div>
+  </div>
+  <button class="btn-primary" id="btn-setup-go" style="max-width:340px">COMEÇAR →</button>
+</div>
+
+<!-- HOME -->
+<div class="screen" id="s-home">
+  <div class="home-header">
+    <div class="home-logo">FLEXSCROLL</div>
+    <button class="partner-btn" id="btn-to-partner">🔐 Parceira</button>
+  </div>
+  <div class="balance-section">
+    <div class="bal-label">Saldo disponível</div>
+    <div class="bal-num zero" id="bal-num">0</div>
+    <div class="bal-unit">minutos</div>
+    <div class="bal-reps" id="bal-reps"></div>
+  </div>
+  <div class="home-history" id="home-history"></div>
+  <div class="home-actions">
+    <button class="btn-primary" id="btn-earn">💪 GANHAR MINUTOS</button>
+    <button class="btn-outline btn-disabled" id="btn-spend">📲 GASTAR MINUTOS</button>
+    <button class="btn-ghost" id="btn-reset-all">Repor tudo</button>
+  </div>
+</div>
+
+<!-- EARN -->
+<div class="screen" id="s-earn">
+  <div class="earn-header">
+    <button class="back-btn" id="btn-earn-back">←</button>
+    <div class="earn-title">GANHAR</div>
+  </div>
+  <div class="cam-wrap">
+    <video id="vid" autoplay playsinline muted></video>
+    <canvas id="cvs"></canvas>
+    <div class="cam-pill">
+      <div class="cdot" id="cdot"></div>
+      <span id="ctxt">A calibrar...</span>
+    </div>
+  </div>
+  <div class="earn-hud">
+    <div class="earn-counters">
+      <div class="ec-block">
+        <div class="ec-lbl">Esta sessão</div>
+        <div class="ec-val big" id="sess-reps">0</div>
+      </div>
+      <div class="ec-div"></div>
+      <div class="ec-block">
+        <div class="ec-lbl">Saldo total</div>
+        <div class="ec-val med" id="sess-total">0 min</div>
+      </div>
+    </div>
+    <div class="pbar-wrap"><div class="pbar" id="pbar"></div></div>
+    <button class="btn-primary" id="btn-earn-done" style="max-width:300px">GUARDAR E VOLTAR</button>
+  </div>
+</div>
+
+<!-- SPEND -->
+<div class="screen" id="s-spend">
+  <div class="spend-row" style="max-width:340px">
+    <button class="back-btn" id="btn-spend-back">←</button>
+    <div class="spend-title">GASTAR</div>
+    <div class="bal-badge" id="spend-badge">0 min</div>
+  </div>
+  <div class="slider-block">
+    <div style="text-align:center">
+      <div class="slider-display" id="spend-val">5</div>
+      <div class="slider-sub">minutos a pedir</div>
+    </div>
+    <input class="range-input" type="range" id="spend-slider" min="1" max="60" value="5">
+    <div class="range-marks"><span>1</span><span>15</span><span>30</span><span>45</span><span>60 min</span></div>
+  </div>
+  <button class="btn-primary" id="btn-gen-code" style="max-width:340px">GERAR CÓDIGO →</button>
+  <button class="btn-ghost" id="btn-spend-cancel" style="max-width:340px">Cancelar</button>
+</div>
+
+<!-- CODE -->
+<div class="screen" id="s-code">
+  <div class="code-intro">Mostra este código<br>à tua parceira</div>
+  <div class="code-box">
+    <div class="code-lbl">Código de desbloqueio</div>
+    <div class="code-chars" id="code-display">------</div>
+    <div class="code-mins" id="code-mins-lbl"></div>
+    <div class="code-expiry">válido por <span id="code-timer">5:00</span></div>
+  </div>
+  <div class="code-steps">
+    <div class="cstep"><div class="csn">1</div><div>Ela abre o FlexScroll e carrega em <strong>"Parceira"</strong></div></div>
+    <div class="cstep"><div class="csn">2</div><div>Entra o PIN secreto e este código</div></div>
+    <div class="cstep"><div class="csn">3</div><div>O sistema confirma — ela desbloqueia o Screen Time pelo número de minutos indicado</div></div>
+  </div>
+  <button class="btn-ghost" id="btn-code-back" style="max-width:340px">Cancelar pedido</button>
+</div>
+
+<!-- PARTNER VALIDATOR -->
+<div class="screen" id="s-partner">
+  <div class="p-logo">🔐 PARCEIRA</div>
+  <div class="p-sub">Valida o pedido do José</div>
+  <div class="p-form">
+    <div class="input-group">
+      <div class="input-label">PIN secreto</div>
+      <input class="pin-input" id="p-pin" type="number" inputmode="numeric" placeholder="••••">
+    </div>
+    <div class="input-group">
+      <div class="input-label">Código do José</div>
+      <input class="code-input" id="p-code" type="text" inputmode="text" placeholder="XXXXXX" maxlength="6">
+    </div>
+    <button class="btn-primary" id="btn-validate">VALIDAR</button>
+  </div>
+  <div id="verdict-wrap" style="width:100%;max-width:320px;"></div>
+  <button class="btn-ghost" id="btn-partner-back" style="max-width:320px;margin-top:4px">← Voltar</button>
+</div>
+
+<!-- ERROR -->
+<div class="screen" id="s-error">
+  <div class="err-icon">📷</div>
+  <div class="err-title">SEM CÂMARA</div>
+  <div class="err-msg" id="err-msg">Permite o acesso à câmara nas definições do Safari e tenta outra vez.</div>
+  <button class="btn-primary" id="btn-err-retry" style="max-width:300px;margin-top:8px">Tentar outra vez</button>
+  <button class="btn-ghost" id="btn-err-back" style="max-width:300px">Voltar</button>
+</div>
+
+<script>
+// ── STORAGE
+const DB={
+  get:k=>{try{return JSON.parse(localStorage.getItem('fs_'+k));}catch(_){return null;}},
+  set:(k,v)=>localStorage.setItem('fs_'+k,JSON.stringify(v)),
+  del:k=>localStorage.removeItem('fs_'+k)
+};
+
+// ── STATE
+let detector=null,stream=null,animId=null;
+let sessReps=0,repState='UP',noseHist=[],calibWin=[],lastRepTime=0;
+let codeTimer=null;
+const CAL=90,MIN_RANGE=0.04,MIN_MS=600;
+
+// ── SCREENS
+const $=id=>document.getElementById(id);
+const SCRS=['s-loading','s-setup','s-home','s-earn','s-spend','s-code','s-partner','s-error'];
+function show(id){SCRS.forEach(s=>$(s).classList.toggle('on',s===id));}
+
+// ── BOOT
+async function boot(){
+  setLoad(10,'A iniciar TensorFlow...');
+  await tf.setBackend('webgl').catch(()=>tf.setBackend('cpu'));
+  await tf.ready();
+  setLoad(50,'A carregar modelo de pose...');
+  detector=await poseDetection.createDetector(
+    poseDetection.SupportedModels.MoveNet,
+    {modelType:poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING}
+  );
+  setLoad(100,'Pronto!');
+  await sleep(400);
+  $('s-loading').classList.remove('on');
+  if(!DB.get('pin')){show('s-setup');}
+  else{show('s-home');refreshHome();}
+}
+function setLoad(p,t){$('lbar').style.width=p+'%';$('ltxt').textContent=t;}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const fmt=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+
+// ── BALANCE
+function getBal(){return DB.get('balance')||0;}
+function setBal(v){DB.set('balance',Math.max(0,v));}
+function addBal(m){setBal(getBal()+m);logHist('earn',m);}
+function useBal(m){setBal(getBal()-m);logHist('spend',m);}
+function logHist(type,mins){
+  const h=DB.get('history')||[];
+  h.unshift({type,mins,ts:Date.now()});
+  if(h.length>20)h.pop();
+  DB.set('history',h);
+}
+
+// ── HOME
+function refreshHome(){
+  const b=getBal();
+  const n=$('bal-num');
+  n.textContent=b;
+  n.className='bal-num'+(b===0?' zero':'');
+  $('bal-reps').textContent=b>0?`≈ ${b} flexões acumuladas`:'';
+  $('btn-spend').classList.toggle('btn-disabled',b<=0);
+  renderHist();
+}
+function renderHist(){
+  const h=DB.get('history')||[];
+  const el=$('home-history');
+  if(!h.length){el.innerHTML='<div style="font-size:10px;color:#222;text-align:center;padding:8px">Sem histórico ainda</div>';return;}
+  el.innerHTML=h.slice(0,5).map(e=>{
+    const t=new Date(e.ts).toLocaleTimeString('pt',{hour:'2-digit',minute:'2-digit'});
+    return `<div class="hist-item"><span class="hist-action">${e.type==='earn'?'💪 ganhou':'📲 gastou'} · ${t}</span><span class="hist-val ${e.type}">${e.type==='earn'?'+':'−'}${e.mins} min</span></div>`;
+  }).join('');
+}
+
+// ── SETUP
+$('btn-setup-go').onclick=()=>{
+  const pin=$('setup-pin').value.trim();
+  if(pin.length<4){alert('O PIN precisa de pelo menos 4 dígitos.');return;}
+  DB.set('pin',pin);DB.set('balance',0);
+  show('s-home');refreshHome();
+};
+
+// ── EARN
+$('btn-earn').onclick=()=>{show('s-earn');startCam();};
+$('btn-earn-back').onclick=()=>{stopCam();saveAndGoHome();};
+$('btn-earn-done').onclick=()=>{stopCam();saveAndGoHome();};
+function saveAndGoHome(){if(sessReps>0)addBal(sessReps);show('s-home');refreshHome();}
+
+async function startCam(){
+  sessReps=0;repState='UP';noseHist=[];calibWin=[];lastRepTime=0;
+  $('sess-reps').textContent='0';updateSessTotal();
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:'environment'},width:{ideal:640},height:{ideal:480}},audio:false
+    });
+    $('vid').srcObject=stream;
+    await new Promise(r=>$('vid').onloadedmetadata=r);
+    await $('vid').play();
+    resizeCvs();detectLoop();
+  }catch(e){
+    $('err-msg').textContent=e.name==='NotAllowedError'
+      ?'Acesso negado. Vai a Definições → Safari → Câmara.':'Erro: '+e.message;
+    show('s-error');
+  }
+}
+function stopCam(){
+  if(animId)cancelAnimationFrame(animId);
+  if(stream)stream.getTracks().forEach(t=>t.stop());
+  animId=null;stream=null;
+}
+function resizeCvs(){const v=$('vid'),c=$('cvs');c.width=v.videoWidth||640;c.height=v.videoHeight||480;}
+async function detectLoop(){
+  const vid=$('vid'),cvs=$('cvs'),ctx=cvs.getContext('2d');
+  async function frame(){
+    if(vid.readyState>=2){
+      let poses=[];
+      try{poses=await detector.estimatePoses(vid);}catch(_){}
+      ctx.clearRect(0,0,cvs.width,cvs.height);
+      if(poses.length){drawSkel(ctx,poses[0],cvs.width,cvs.height);processpose(poses[0],cvs.height);}
+      else setStatus('off','Posiciona-te em frente à câmara');
+    }
+    animId=requestAnimationFrame(frame);
+  }
+  frame();
+}
+function processpose(pose,fH){
+  const nose=pose.keypoints[0];
+  if(!nose||nose.score<0.25){setStatus('off','Não consigo ver-te...');return;}
+  const ny=nose.y/fH;
+  noseHist.push(ny);if(noseHist.length>8)noseHist.shift();
+  const sm=noseHist.reduce((a,b)=>a+b,0)/noseHist.length;
+  calibWin.push(sm);if(calibWin.length>CAL)calibWin.shift();
+  const cMax=Math.max(...calibWin),cMin=Math.min(...calibWin),range=cMax-cMin;
+  const pct=range>0.01?Math.min(100,Math.max(0,((sm-cMin)/range)*100)):50;
+  $('pbar').style.width=pct+'%';
+  if(calibWin.length<30){setStatus('off','A calibrar... faz uma flexão devagar');return;}
+  if(range<MIN_RANGE){setStatus('live','Detectado — começa!');return;}
+  const dT=cMin+range*.62,uT=cMin+range*.38;
+  if(repState==='UP'&&sm>dT){repState='DOWN';setStatus('low','Boa — agora sobe!');}
+  else if(repState==='DOWN'&&sm<uT){
+    const now=Date.now();
+    if(now-lastRepTime>MIN_MS){repState='UP';lastRepTime=now;countRep();}
+  }else{
+    if(repState==='UP')setStatus('live','Pronto — desce!');
+  }
+}
+function countRep(){
+  sessReps++;
+  $('sess-reps').textContent=sessReps;
+  updateSessTotal();
+  doFlash();
+}
+function updateSessTotal(){$('sess-total').textContent=(getBal()+sessReps)+' min';}
+function setStatus(t,msg){
+  $('cdot').className='cdot'+(t==='live'?' live':t==='low'?' low':'');
+  $('ctxt').textContent=msg;
+}
+function doFlash(){const f=$('flash');f.classList.add('show');setTimeout(()=>f.classList.remove('show'),120);}
+
+// ── SKELETON
+const CONNS=[[0,1],[0,2],[1,3],[2,4],[5,6],[5,7],[7,9],[6,8],[8,10],[5,11],[6,12],[11,12],[11,13],[13,15],[12,14],[14,16]];
+function drawSkel(ctx,pose,w,h){
+  const kps=pose.keypoints,sx=w/($('vid').videoWidth||w),sy=h/($('vid').videoHeight||h);
+  ctx.strokeStyle='rgba(245,166,35,0.65)';ctx.lineWidth=2;
+  for(const[a,b]of CONNS){
+    const ka=kps[a],kb=kps[b];
+    if(!ka||!kb||ka.score<0.25||kb.score<0.25)continue;
+    ctx.beginPath();ctx.moveTo(ka.x*sx,ka.y*sy);ctx.lineTo(kb.x*sx,kb.y*sy);ctx.stroke();
+  }
+  for(const kp of kps){
+    if(!kp||kp.score<0.25)continue;
+    ctx.beginPath();ctx.arc(kp.x*sx,kp.y*sy,4,0,Math.PI*2);
+    ctx.fillStyle='#F5A623';ctx.fill();
+  }
+}
+
+// ── SPEND
+$('btn-spend').onclick=()=>{
+  const b=getBal();
+  $('spend-badge').textContent=b+' min';
+  const sl=$('spend-slider');
+  sl.max=Math.min(60,b);sl.value=Math.min(5,b);
+  $('spend-val').textContent=sl.value;
+  show('s-spend');
+};
+$('btn-spend-back').onclick=$('btn-spend-cancel').onclick=()=>{show('s-home');refreshHome();};
+$('spend-slider').oninput=function(){$('spend-val').textContent=this.value;};
+$('btn-gen-code').onclick=()=>{
+  const mins=parseInt($('spend-slider').value);
+  const pin=DB.get('pin');
+  const code=genCode(mins,pin);
+  $('code-display').textContent=code;
+  $('code-mins-lbl').textContent=mins+' minuto'+(mins>1?'s':'')+' de scroll';
+  show('s-code');
+  startCodeTimer(5*60);
+};
+$('btn-code-back').onclick=()=>{clearInterval(codeTimer);show('s-home');refreshHome();};
+
+function startCodeTimer(sec){
+  clearInterval(codeTimer);
+  let left=sec;
+  $('code-timer').textContent=fmt(left);
+  $('code-display').style.opacity='1';
+  codeTimer=setInterval(()=>{
+    left--;
+    $('code-timer').textContent=fmt(left);
+    if(left<=0){
+      clearInterval(codeTimer);
+      $('code-display').style.opacity='.25';
+      $('code-timer').textContent='EXPIRADO';
+    }
+  },1000);
+}
+
+// ── CODE ALGO
+function hashPin(pin){
+  let h=5381;
+  for(let i=0;i<pin.length;i++)h=((h<<5)+h)+pin.charCodeAt(i);
+  return Math.abs(h);
+}
+function getSlot(ts){return Math.floor((ts||Date.now())/300000);}
+function genCode(mins,pin){
+  const slot=getSlot();
+  const raw=(slot*31337+mins*9973+hashPin(pin)*7)%1679616;
+  return raw.toString(36).toUpperCase().padStart(6,'0');
+}
+function validateCode(code,pin){
+  const now=Date.now();
+  for(let off=0;off<=1;off++){
+    const slot=getSlot(now)-off;
+    for(let m=1;m<=60;m++){
+      const raw=(slot*31337+m*9973+hashPin(pin)*7)%1679616;
+      const c=raw.toString(36).toUpperCase().padStart(6,'0');
+      if(c===code.toUpperCase().trim())return m;
+    }
+  }
+  return null;
+}
+
+// ── PARTNER
+$('btn-to-partner').onclick=()=>{$('verdict-wrap').innerHTML='';$('p-pin').value='';$('p-code').value='';show('s-partner');};
+$('btn-partner-back').onclick=()=>{show('s-home');refreshHome();};
+$('btn-validate').onclick=()=>{
+  const pin=$('p-pin').value.trim(),code=$('p-code').value.trim();
+  if(!pin||!code)return;
+  if(pin!==DB.get('pin')){renderVerdict(false,null,'PIN incorreto.');return;}
+  const mins=validateCode(code,pin);
+  if(mins){useBal(mins);renderVerdict(true,mins);}
+  else renderVerdict(false,null,'Código inválido ou expirado.');
+};
+function renderVerdict(ok,mins,msg){
+  $('verdict-wrap').innerHTML=ok
+    ?`<div class="verdict ok"><div class="v-icon">✅</div><div class="v-title">VÁLIDO</div><div class="v-mins">${mins}</div><div class="v-msg">Desbloqueia <strong>${mins} minuto${mins>1?'s':''}</strong> no Screen Time</div></div>`
+    :`<div class="verdict fail"><div class="v-icon">❌</div><div class="v-title">INVÁLIDO</div><div class="v-msg">${msg}</div></div>`;
+}
+
+// ── MISC
+$('btn-reset-all').onclick=()=>{
+  if(confirm('Repor tudo? Perdes o saldo e o histórico.')){
+    ['balance','history','pin'].forEach(k=>DB.del(k));
+    show('s-setup');
+  }
+};
+$('btn-err-retry').onclick=()=>{show('s-earn');startCam();};
+$('btn-err-back').onclick=()=>{show('s-home');refreshHome();};
+
+boot().catch(e=>{$('err-msg').textContent='Erro ao carregar: '+e.message;show('s-error');});
+</script>
+</body>
+</html>
